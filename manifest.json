@@ -1,0 +1,24 @@
+{
+  "name": "Super Quora",
+  "version": "0.0.1",
+  "description": "Enhance your Quora experience",
+  "manifest_version": 2,
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.quora.com/*"
+      ],
+      "js": [
+        "build/distributions/super-quora.js"
+      ],
+      "runat": "document_end"
+    }
+  ]
+}

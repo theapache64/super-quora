@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="super-quora-v0.0.1-alpha01">
+    <output-path>$PROJECT_DIR$/build/libs</output-path>
+    <root id="archive" name="super-quora-v0.0.1-alpha01.jar">
+      <element id="module-output" name="super-quora.main" />
+    </root>
+  </artifact>
+</component>
