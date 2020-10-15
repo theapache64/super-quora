@@ -1,12 +1,13 @@
 # super-quora 🚀
 
-super-quora is a Google Chrome extension add power features to Quora.com
+super-quora is a Google Chrome extension to add powerful features to `Quora.com`
 
 ## TODO ☑️
 
-### Random Quora 
+### Random Answer 
 
-To open random answer of a specific question. Useful for people who want to read answers of a question which got a huge amount of answers.
+To open random answer of a specific question. Useful for people who struggle to track the answers they read on a 
+question which got a huge amount of answers. Everytime you press the "RANDOM ANSWER" button, you'll be prompted with a new tab.
 
 ## Author ✍️
 
