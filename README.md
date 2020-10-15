@@ -1,8 +1,13 @@
-# random-quora
+# super-quora 🚀
 
-random-quora is a google chrome extension to open random answer of a specific question. This extension is useful for people who wants to read 
-answers of a question which got huge amount of answers.
+super-quora is a Google Chrome extension add power features to Quora.com
 
-## Author
+## TODO ☑️
+
+### Random Quora 
+
+To open random answer of a specific question. Useful for people who want to read answers of a question which got a huge amount of answers.
+
+## Author ✍️
 
 - theapache64
