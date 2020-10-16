@@ -1,9 +1,6 @@
-
 import org.w3c.xhr.XMLHttpRequest
 import kotlin.browser.document
 import kotlin.js.Json
-import kotlin.math.log
-
 
 fun main() {
     document.documentElement?.outerHTML?.let { pageData ->
@@ -47,12 +44,4 @@ fun onHashUrl(hashUrl: String) {
 
 fun onHash(hash: String) {
     println("Hash is $hash")
-    chrome.tabs.create(Tab {
-        url = "https://google.com"
-    }) {
-
-    }
-    chrome.cookies.getAllCookieStores {
-        println("Cookie is $it")
-    }
 }
