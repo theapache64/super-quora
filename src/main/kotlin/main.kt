@@ -11,8 +11,8 @@ fun main() {
 
         // Getting question id
         val qIdRegEx = "\"pageOid\": (?<qId>\\d+)".toRegex()
-        val qId = qIdRegEx.find(pageData)!!.groupValues[1]
-        println("Question ID : '$qId'")
+        val questionId = qIdRegEx.find(pageData)!!.groupValues[1]
+        println("Question ID : '$questionId'")
 
         // Getting hashUrl
         val x1 = pageData.split("ansFrontendRelayWebpackManifest = ")
@@ -21,27 +21,53 @@ fun main() {
         val hashUrl = j1["page-QuestionPageLoadable"].toString()
         println("hashUrl: $hashUrl")
 
-        onHashUrl(hashUrl)
+        // Getting hash response
+        val xhr = XMLHttpRequest()
+        xhr.open("GET", hashUrl)
+        xhr.onreadystatechange = {
+            if (xhr.readyState.toInt() == 4 && xhr.status.toInt() == 200) {
+                val hashRegEx = "name:\"QuestionAnswerPagedListQuery\".+?,id:\"(?<hash>.+?)\",".toRegex()
+                val data = xhr.responseText
+                val matchResult = hashRegEx.find(data)!!
+                val hash = matchResult.groupValues[1]
+                onAllRequiredParamsAreReady(
+                    formKey,
+                    questionId,
+                    hash
+                )
+            }
+        };
+        xhr.send()
     }
-
 }
 
-fun onHashUrl(hashUrl: String) {
-    // Getting response
+
+fun onAllRequiredParamsAreReady(formKey: String, questionId: String, hash: String) {
+    // Let's do the final REST call
+    val requestBody = """
+        {
+            "queryName": "QuestionAnswerPagedListQuery",
+            "extensions": {
+                "hash": "$hash"
+            },
+            "variables": {
+                "qid": $questionId,
+                "first": 50,
+                "after": "0"
+            }
+        }
+    """.trimIndent()
+
     val xhr = XMLHttpRequest()
-    xhr.open("GET", hashUrl)
+    xhr.open("POST", "https://www.quora.com/graphql/gql_para_POST?q=QuestionAnswerPagedListQuery")
+    xhr.setRequestHeader("content-type", "application/json")
+    xhr.setRequestHeader("quora-formkey", formKey)
     xhr.onreadystatechange = {
         if (xhr.readyState.toInt() == 4 && xhr.status.toInt() == 200) {
-            val hashRegEx = "name:\"QuestionAnswerPagedListQuery\".+?,id:\"(?<hash>.+?)\",".toRegex()
-            val data = xhr.responseText
-            val matchResult = hashRegEx.find(data)!!
-            val hash = matchResult.groupValues[1]
-            onHash(hash)
+            console.log("Hurray : ${xhr.responseText}")
         }
     };
-    xhr.send()
+    xhr.send(requestBody)
 }
 
-fun onHash(hash: String) {
-    println("Hash is $hash")
-}
+
