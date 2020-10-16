@@ -1,3 +1,4 @@
+
 import org.w3c.xhr.XMLHttpRequest
 import kotlin.browser.document
 import kotlin.js.Json
@@ -46,4 +47,12 @@ fun onHashUrl(hashUrl: String) {
 
 fun onHash(hash: String) {
     println("Hash is $hash")
+    chrome.tabs.create(Tab {
+        url = "https://google.com"
+    }) {
+
+    }
+    chrome.cookies.getAllCookieStores {
+        println("Cookie is $it")
+    }
 }
