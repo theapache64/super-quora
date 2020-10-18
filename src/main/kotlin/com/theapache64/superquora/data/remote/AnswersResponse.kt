@@ -1,4 +1,5 @@
-import kotlinx.serialization.Contextual
+package com.theapache64.superquora.data.remote
+
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -24,7 +25,7 @@ data class Question(
     @SerialName("qid")
     val qid: Int, // 2063934
     @SerialName("__typename")
-    val typename: String // Question
+    val typename: String // com.theapache64.sq.data.remote.Question
 )
 
 @Serializable

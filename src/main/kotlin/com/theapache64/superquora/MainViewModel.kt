@@ -1,75 +1,72 @@
+package com.theapache64.superquora
+
+import com.theapache64.superquora.data.remote.Answer
+import com.theapache64.superquora.data.remote.AnswersResponse
+import com.theapache64.superquora.models.Params
+import com.theapache64.superquora.utils.AjaxHelper
+import com.theapache64.superquora.utils.HashHelper
+import com.theapache64.superquora.utils.HtmlAnalyzer
 import org.w3c.xhr.XMLHttpRequest
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
-import kotlin.js.JSON.parse
 
 private const val KEY_READ_ANSWERS = "read_answers"
 private lateinit var params: Params
+private var fatalError: String? = null
+
 fun main() {
     document.documentElement?.outerHTML?.let { pageData ->
-        // Getting form key
-        val formKeyRegEx = "\"formkey\": \"(?<formKey>.+?)\"".toRegex()
-        val formKey = formKeyRegEx.find(pageData)!!.groupValues[1]
-        println("Form key : '$formKey'")
 
-        // Getting question id
-        val qIdRegEx = "\"pageOid\": (?<qId>\\d+)".toRegex()
-        val questionId = qIdRegEx.find(pageData)!!.groupValues[1]
-        println("Question ID : '$questionId'")
+        val htmlAnalyzer = HtmlAnalyzer(pageData)
+        val formKey = htmlAnalyzer.getFormKey()
+        val questionId = htmlAnalyzer.getQuestionId()
+        val hashUrl = htmlAnalyzer.getHashUrl()
 
-        // Getting hashUrl
-        val x1 = pageData.split("ansFrontendRelayWebpackManifest = ")
-        val x2 = x1[1].split("\"};")[0] + "\"}"
-        val j1 = parse<kotlin.js.Json>(x2)
-        val hashUrl = j1["page-QuestionPageLoadable"].toString()
-        println("hashUrl: $hashUrl")
 
-        // Getting hash response
-        val xhr = XMLHttpRequest()
-        xhr.open("GET", hashUrl)
-        xhr.onreadystatechange = {
-            if (xhr.readyState.toInt() == 4 && xhr.status.toInt() == 200) {
-                val hashRegEx = "name:\"QuestionAnswerPagedListQuery\".+?,id:\"(?<hash>.+?)\",".toRegex()
-                val data = xhr.responseText
-                val matchResult = hashRegEx.find(data)!!
-                val hash = matchResult.groupValues[1]
+        // Getting hash
+        AjaxHelper.get(
+            hashUrl,
+            onSuccess = { response ->
                 params = Params(
                     formKey,
                     questionId,
-                    hash
+                    HashHelper.getHashFrom(response)
                 )
                 onParamsReady()
+            },
+            onError = {
+                fatalError = "Failed to get hash"
+                console.log(fatalError)
             }
-        };
-        xhr.send()
+        )
+
     }
 
     // Setting click listener on page
     document.body?.onmousedown = {
         if (it.button == 1.toShort()) {
 
-
             println("Total Answers In Memory:  ${fullAnswers.size}")
-            println("Read Answers:  ${readAnswers.size}")
+            println("Read Answers:  ${openedAnswers.size}")
 
             getRandomAnswer(
                 onAnswer = { randomAnswer ->
                     console.log("Random : $randomAnswer")
-                    /*window.open(
+                    window.open(
                         "https://quora.com${randomAnswer.permaUrl}",
                         "_blank"
-                    )*/
+                    )
                 },
-                onLoading = {
-                    console.log("You've read all the answers in cache. Now requesting for more answers...")
+                onLoadingMore = {
+                    console.log("You've read all the answers in cache. Now requesting for more answers. Hold tight")
                 },
-                onAllAnswersRead = {
-                    console.log("WTF! You read all answers available to this question")
+                onNoMoreAnswer = {
+                    window.alert("WTF! You read all answers available to this question")
                 },
                 onError = { message ->
-                    console.log(message)
+                    window.alert(message)
                 }
             )
         }
@@ -79,36 +76,43 @@ fun main() {
 
 fun getRandomAnswer(
     onAnswer: (Answer) -> Unit,
-    onLoading: () -> Unit,
-    onAllAnswersRead: () -> Unit,
+    onLoadingMore: () -> Unit,
+    onNoMoreAnswer: () -> Unit,
     onError: (message: String) -> Unit
 ) {
     if (fullAnswers.isNotEmpty()) {
+
         val randomAnswer = fullAnswers
-            .filter { readAnswers.contains(it.id).not() } // answers that are not in read list
+            .filter { openedAnswers.contains(it.id).not() } // answers that are not in read list
             .randomOrNull()
 
         if (randomAnswer != null) {
             // Add answer to read list
-            val readAnswersHot: MutableSet<String> = (window.localStorage.getItem(KEY_READ_ANSWERS) ?: "[]").let {
+            val openedAnswersHot: MutableSet<String> = (window.localStorage.getItem(KEY_READ_ANSWERS) ?: "[]").let {
                 Json.decodeFromString(it)
             }
-            readAnswersHot.add(randomAnswer.id)
-            window.localStorage.setItem(KEY_READ_ANSWERS, JSON.stringify(readAnswersHot))
-            readAnswers = readAnswersHot
+            openedAnswersHot.add(randomAnswer.id)
+            window.localStorage.setItem(KEY_READ_ANSWERS, JSON.stringify(openedAnswersHot))
+
+            // Refresh read list
+            openedAnswers.clear()
+            openedAnswers.addAll(openedAnswersHot)
 
             onAnswer(randomAnswer)
         } else {
             // Load more answers
-            onLoading()
+            onLoadingMore()
             loadNextPage(
                 onDataLoaded = {
                     getRandomAnswer(
-                        onAnswer, onLoading, onAllAnswersRead, onError
+                        onAnswer = {
+                            window.alert("Now try!")
+                            onAnswer(it)
+                        }, onLoadingMore, onNoMoreAnswer, onError
                     )
                 },
                 onError = {
-                    onAllAnswersRead()
+                    onNoMoreAnswer()
                 }
             )
         }
@@ -117,7 +121,11 @@ fun getRandomAnswer(
     }
 }
 
-var readAnswers = mutableSetOf<String>()
+val openedAnswers: MutableSet<String> by lazy {
+    (window.localStorage.getItem(KEY_READ_ANSWERS) ?: "[]").let {
+        Json.decodeFromString(it)
+    }
+}
 val fullAnswers = mutableListOf<Answer>()
 var currentPage: Int = 0
 
@@ -143,7 +151,7 @@ private fun loadNextPage(
                 fullAnswers.addAll(currentPageAnswers)
                 onDataLoaded()
             } else {
-                // Data finished
+                // com.theapache64.sq.data.remote.Data finished
                 onError("No more answers")
             }
         },
@@ -187,7 +195,9 @@ fun getAnswers(pageNo: Int, successCallback: (AnswersResponse) -> Unit, errorCal
 
                 successCallback(json)
             } else {
-                errorCallback("Failed to get answers : ${xhr.status} -> '${xhr.responseText}'")
+                val message = "Failed to get answers : ${xhr.status} -> '${xhr.responseText}'"
+                console.error(message)
+                errorCallback(message)
             }
         }
     };
