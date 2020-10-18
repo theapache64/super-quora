@@ -1,7 +1,12 @@
 import org.w3c.xhr.XMLHttpRequest
-import kotlin.browser.document
-import kotlin.js.Json
+import kotlinx.browser.document
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlin.js.JSON.parse
 
+
+private lateinit var params: Params
+private var page = 1
 fun main() {
     document.documentElement?.outerHTML?.let { pageData ->
         // Getting form key
@@ -17,7 +22,7 @@ fun main() {
         // Getting hashUrl
         val x1 = pageData.split("ansFrontendRelayWebpackManifest = ")
         val x2 = x1[1].split("\"};")[0] + "\"}"
-        val j1 = JSON.parse<Json>(x2)
+        val j1 = parse<kotlin.js.Json>(x2)
         val hashUrl = j1["page-QuestionPageLoadable"].toString()
         println("hashUrl: $hashUrl")
 
@@ -30,30 +35,47 @@ fun main() {
                 val data = xhr.responseText
                 val matchResult = hashRegEx.find(data)!!
                 val hash = matchResult.groupValues[1]
-                onAllRequiredParamsAreReady(
+                params = Params(
                     formKey,
                     questionId,
                     hash
                 )
+                onParamsReady()
             }
         };
         xhr.send()
     }
 }
 
+fun onParamsReady() {
+    getAnswers(
+        pageNo = 1,
+        successCallback = {
+            println("Got ${it.size} answers")
+        },
+        errorCallback = {
+            println("Error: ${it}")
+        }
+    )
+}
 
-fun onAllRequiredParamsAreReady(formKey: String, questionId: String, hash: String) {
+const val ANSWER_PER_REQUEST = 10
+
+fun getAnswers(pageNo: Int, successCallback: (List<Answer>) -> Unit, errorCallback: (String) -> Unit) {
+
+    val after = (pageNo - 1) * ANSWER_PER_REQUEST
+
     // Let's do the final REST call
     val requestBody = """
         {
             "queryName": "QuestionAnswerPagedListQuery",
             "extensions": {
-                "hash": "$hash"
+                "hash": "${params.hash}"
             },
             "variables": {
-                "qid": $questionId,
-                "first": 50,
-                "after": "0"
+                "qid": ${params.questionId},
+                "first": $ANSWER_PER_REQUEST,
+                "after": "$after"
             }
         }
     """.trimIndent()
@@ -61,13 +83,23 @@ fun onAllRequiredParamsAreReady(formKey: String, questionId: String, hash: Strin
     val xhr = XMLHttpRequest()
     xhr.open("POST", "https://www.quora.com/graphql/gql_para_POST?q=QuestionAnswerPagedListQuery")
     xhr.setRequestHeader("content-type", "application/json")
-    xhr.setRequestHeader("quora-formkey", formKey)
+    xhr.setRequestHeader("quora-formkey", params.formKey)
     xhr.onreadystatechange = {
-        if (xhr.readyState.toInt() == 4 && xhr.status.toInt() == 200) {
-            console.log("Hurray : ${xhr.responseText}")
+        if (xhr.readyState.toInt() == 4) {
+            if (xhr.status.toInt() == 200) {
+                val json = Json {
+                    ignoreUnknownKeys = true
+                }.decodeFromString<AnswersResponse>(xhr.responseText)
+                println("Edged : ${json.data.question.pagedListDataConnection.edges.size}")
+            } else {
+                errorCallback("Failed to get answers : ${xhr.status} -> '${xhr.responseText}'")
+            }
         }
     };
     xhr.send(requestBody)
 }
+
+
+
 
 
