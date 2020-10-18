@@ -1,12 +1,12 @@
 import org.w3c.xhr.XMLHttpRequest
 import kotlinx.browser.document
+import kotlinx.browser.window
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.js.JSON.parse
 
-
+private const val KEY_READ_ANSWERS = "read_answers"
 private lateinit var params: Params
-private var page = 1
 fun main() {
     document.documentElement?.outerHTML?.let { pageData ->
         // Getting form key
@@ -45,23 +45,117 @@ fun main() {
         };
         xhr.send()
     }
+
+    // Setting click listener on page
+    document.body?.onmousedown = {
+        if (it.button == 1.toShort()) {
+
+
+            println("Total Answers In Memory:  ${fullAnswers.size}")
+            println("Read Answers:  ${readAnswers.size}")
+
+            getRandomAnswer(
+                onAnswer = { randomAnswer ->
+                    console.log("Random : $randomAnswer")
+                    /*window.open(
+                        "https://quora.com${randomAnswer.permaUrl}",
+                        "_blank"
+                    )*/
+                },
+                onLoading = {
+                    console.log("You've read all the answers in cache. Now requesting for more answers...")
+                },
+                onAllAnswersRead = {
+                    console.log("WTF! You read all answers available to this question")
+                },
+                onError = { message ->
+                    console.log(message)
+                }
+            )
+        }
+    }
+
 }
 
+fun getRandomAnswer(
+    onAnswer: (Answer) -> Unit,
+    onLoading: () -> Unit,
+    onAllAnswersRead: () -> Unit,
+    onError: (message: String) -> Unit
+) {
+    if (fullAnswers.isNotEmpty()) {
+        val randomAnswer = fullAnswers
+            .filter { readAnswers.contains(it.id).not() } // answers that are not in read list
+            .randomOrNull()
+
+        if (randomAnswer != null) {
+            // Add answer to read list
+            val readAnswersHot: MutableSet<String> = (window.localStorage.getItem(KEY_READ_ANSWERS) ?: "[]").let {
+                Json.decodeFromString(it)
+            }
+            readAnswersHot.add(randomAnswer.id)
+            window.localStorage.setItem(KEY_READ_ANSWERS, JSON.stringify(readAnswersHot))
+            readAnswers = readAnswersHot
+
+            onAnswer(randomAnswer)
+        } else {
+            // Load more answers
+            onLoading()
+            loadNextPage(
+                onDataLoaded = {
+                    getRandomAnswer(
+                        onAnswer, onLoading, onAllAnswersRead, onError
+                    )
+                },
+                onError = {
+                    onAllAnswersRead()
+                }
+            )
+        }
+    } else {
+        onError("Answers are not ready!")
+    }
+}
+
+var readAnswers = mutableSetOf<String>()
+val fullAnswers = mutableListOf<Answer>()
+var currentPage: Int = 0
+
 fun onParamsReady() {
+    loadNextPage()
+}
+
+private fun loadNextPage(
+    onDataLoaded: () -> Unit = {},
+    onError: (message: String) -> Unit = {}
+) {
+    currentPage++
     getAnswers(
-        pageNo = 1,
-        successCallback = {
-            println("Got ${it.size} answers")
+        pageNo = currentPage,
+        successCallback = { answersResponse ->
+            val currentPageAnswers = answersResponse.data
+                .question
+                .pagedListDataConnection.edges
+                .filter { it.node.answer != null }
+                .map { it.node.answer!! }
+
+            if (currentPageAnswers.isNotEmpty()) {
+                fullAnswers.addAll(currentPageAnswers)
+                onDataLoaded()
+            } else {
+                // Data finished
+                onError("No more answers")
+            }
         },
         errorCallback = {
-            println("Error: ${it}")
+            onError(it)
         }
     )
 }
 
 const val ANSWER_PER_REQUEST = 10
 
-fun getAnswers(pageNo: Int, successCallback: (List<Answer>) -> Unit, errorCallback: (String) -> Unit) {
+fun getAnswers(pageNo: Int, successCallback: (AnswersResponse) -> Unit, errorCallback: (String) -> Unit) {
 
     val after = (pageNo - 1) * ANSWER_PER_REQUEST
 
@@ -90,7 +184,8 @@ fun getAnswers(pageNo: Int, successCallback: (List<Answer>) -> Unit, errorCallba
                 val json = Json {
                     ignoreUnknownKeys = true
                 }.decodeFromString<AnswersResponse>(xhr.responseText)
-                println("Edged : ${json.data.question.pagedListDataConnection.edges.size}")
+
+                successCallback(json)
             } else {
                 errorCallback("Failed to get answers : ${xhr.status} -> '${xhr.responseText}'")
             }
@@ -98,6 +193,7 @@ fun getAnswers(pageNo: Int, successCallback: (List<Answer>) -> Unit, errorCallba
     };
     xhr.send(requestBody)
 }
+
 
 
 
