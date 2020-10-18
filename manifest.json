@@ -13,7 +13,11 @@
       "matches": [
         "https://www.quora.com/*"
       ],
+      "css": [
+        "libs/notiflix-2.6.0.min.css"
+      ],
       "js": [
+        "libs/notiflix-2.6.0.min.js",
         "build/distributions/super-quora.js"
       ],
       "runat": "document_end"

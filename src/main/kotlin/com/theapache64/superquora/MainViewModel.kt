@@ -1,29 +1,60 @@
 package com.theapache64.superquora
 
 import com.theapache64.superquora.data.remote.Answer
-import com.theapache64.superquora.data.remote.AnswersResponse
+import com.theapache64.superquora.data.repo.AnswerRepo
 import com.theapache64.superquora.models.Params
 import com.theapache64.superquora.utils.AjaxHelper
 import com.theapache64.superquora.utils.HashHelper
 import com.theapache64.superquora.utils.HtmlAnalyzer
-import org.w3c.xhr.XMLHttpRequest
 import kotlinx.browser.document
 import kotlinx.browser.window
-import kotlinx.serialization.*
-import kotlinx.serialization.json.*
+import org.w3c.dom.url.URL
 
-private const val KEY_READ_ANSWERS = "read_answers"
 private lateinit var params: Params
 private var fatalError: String? = null
 
+val fullAnswers = mutableListOf<Answer>()
+var currentPage: Int = 0
+
 fun main() {
+
+    when (window.location.toString().count { char -> char == '/' }) {
+        3 -> {
+            // question
+            watchOpenRandomAnswer()
+        }
+
+        5 -> {
+            // answer
+            watchForRemoveAnswerFromOpenedList()
+        }
+
+    }
+
+}
+
+fun watchForRemoveAnswerFromOpenedList() {
+
+    // Setting click listener on page
+    document.body?.onmousedown = {
+        console.log(it)
+        if (it.button == 1.toShort()) {
+            val answerId = URL(window.location.toString()).searchParams.get("id")
+            if (answerId != null) {
+                AnswerRepo.removeFromOpenedAnswers(answerId)
+                Notiflix.Notify.Success("Removed answer from opened answer list")
+            }
+        }
+    }
+}
+
+private fun watchOpenRandomAnswer() {
     document.documentElement?.outerHTML?.let { pageData ->
 
         val htmlAnalyzer = HtmlAnalyzer(pageData)
         val formKey = htmlAnalyzer.getFormKey()
         val questionId = htmlAnalyzer.getQuestionId()
         val hashUrl = htmlAnalyzer.getHashUrl()
-
 
         // Getting hash
         AjaxHelper.get(
@@ -34,6 +65,7 @@ fun main() {
                     questionId,
                     HashHelper.getHashFrom(response)
                 )
+                console.log("Params ready -> $params")
                 onParamsReady()
             },
             onError = {
@@ -46,33 +78,36 @@ fun main() {
 
     // Setting click listener on page
     document.body?.onmousedown = {
+
         if (it.button == 1.toShort()) {
+            if (fatalError != null) {
+                window.alert(fatalError!!)
+            } else {
 
-            println("Total Answers In Memory:  ${fullAnswers.size}")
-            println("Read Answers:  ${openedAnswers.size}")
-
-            getRandomAnswer(
-                onAnswer = { randomAnswer ->
-                    console.log("Random : $randomAnswer")
-                    window.open(
-                        "https://quora.com${randomAnswer.permaUrl}",
-                        "_blank"
-                    )
-                },
-                onLoadingMore = {
-                    console.log("You've read all the answers in cache. Now requesting for more answers. Hold tight")
-                },
-                onNoMoreAnswer = {
-                    window.alert("WTF! You read all answers available to this question")
-                },
-                onError = { message ->
-                    window.alert(message)
-                }
-            )
+                getRandomAnswer(
+                    onAnswer = { randomAnswer ->
+                        console.log("Random : $randomAnswer")
+                        window.open(
+                            "https://quora.com${randomAnswer.permaUrl}?id=${randomAnswer.id}",
+                            "_blank"
+                        )
+                    },
+                    onLoadingMore = {
+                        Notiflix.Notify.Info("You've already read all answers in page $currentPage, checking next page")
+                    },
+                    onNoMoreAnswer = {
+                        fatalError = "No more random answers. You've read all!"
+                        Notiflix.Notify.Failure(fatalError!!)
+                    },
+                    onError = { message ->
+                        Notiflix.Notify.Failure("Error: $message")
+                    }
+                )
+            }
         }
     }
-
 }
+
 
 fun getRandomAnswer(
     onAnswer: (Answer) -> Unit,
@@ -82,22 +117,14 @@ fun getRandomAnswer(
 ) {
     if (fullAnswers.isNotEmpty()) {
 
+        val openedAnswers = AnswerRepo.getOpenedAnswers()
+
         val randomAnswer = fullAnswers
             .filter { openedAnswers.contains(it.id).not() } // answers that are not in read list
             .randomOrNull()
 
         if (randomAnswer != null) {
-            // Add answer to read list
-            val openedAnswersHot: MutableSet<String> = (window.localStorage.getItem(KEY_READ_ANSWERS) ?: "[]").let {
-                Json.decodeFromString(it)
-            }
-            openedAnswersHot.add(randomAnswer.id)
-            window.localStorage.setItem(KEY_READ_ANSWERS, JSON.stringify(openedAnswersHot))
-
-            // Refresh read list
-            openedAnswers.clear()
-            openedAnswers.addAll(openedAnswersHot)
-
+            AnswerRepo.appendToOpenedAnswers(randomAnswer)
             onAnswer(randomAnswer)
         } else {
             // Load more answers
@@ -106,7 +133,6 @@ fun getRandomAnswer(
                 onDataLoaded = {
                     getRandomAnswer(
                         onAnswer = {
-                            window.alert("Now try!")
                             onAnswer(it)
                         }, onLoadingMore, onNoMoreAnswer, onError
                     )
@@ -117,17 +143,9 @@ fun getRandomAnswer(
             )
         }
     } else {
-        onError("Answers are not ready!")
+        Notiflix.Notify.Info("Wo wo wo! Wait a sec. Quora is not fast as you ...")
     }
 }
-
-val openedAnswers: MutableSet<String> by lazy {
-    (window.localStorage.getItem(KEY_READ_ANSWERS) ?: "[]").let {
-        Json.decodeFromString(it)
-    }
-}
-val fullAnswers = mutableListOf<Answer>()
-var currentPage: Int = 0
 
 fun onParamsReady() {
     loadNextPage()
@@ -138,8 +156,9 @@ private fun loadNextPage(
     onError: (message: String) -> Unit = {}
 ) {
     currentPage++
-    getAnswers(
+    AnswerRepo.getAnswers(
         pageNo = currentPage,
+        params = params,
         successCallback = { answersResponse ->
             val currentPageAnswers = answersResponse.data
                 .question
@@ -151,58 +170,17 @@ private fun loadNextPage(
                 fullAnswers.addAll(currentPageAnswers)
                 onDataLoaded()
             } else {
-                // com.theapache64.sq.data.remote.Data finished
                 onError("No more answers")
             }
         },
         errorCallback = {
-            onError(it)
+            onError(it ?: "Something went wrong")
         }
     )
 }
 
-const val ANSWER_PER_REQUEST = 10
 
-fun getAnswers(pageNo: Int, successCallback: (AnswersResponse) -> Unit, errorCallback: (String) -> Unit) {
 
-    val after = (pageNo - 1) * ANSWER_PER_REQUEST
-
-    // Let's do the final REST call
-    val requestBody = """
-        {
-            "queryName": "QuestionAnswerPagedListQuery",
-            "extensions": {
-                "hash": "${params.hash}"
-            },
-            "variables": {
-                "qid": ${params.questionId},
-                "first": $ANSWER_PER_REQUEST,
-                "after": "$after"
-            }
-        }
-    """.trimIndent()
-
-    val xhr = XMLHttpRequest()
-    xhr.open("POST", "https://www.quora.com/graphql/gql_para_POST?q=QuestionAnswerPagedListQuery")
-    xhr.setRequestHeader("content-type", "application/json")
-    xhr.setRequestHeader("quora-formkey", params.formKey)
-    xhr.onreadystatechange = {
-        if (xhr.readyState.toInt() == 4) {
-            if (xhr.status.toInt() == 200) {
-                val json = Json {
-                    ignoreUnknownKeys = true
-                }.decodeFromString<AnswersResponse>(xhr.responseText)
-
-                successCallback(json)
-            } else {
-                val message = "Failed to get answers : ${xhr.status} -> '${xhr.responseText}'"
-                console.error(message)
-                errorCallback(message)
-            }
-        }
-    };
-    xhr.send(requestBody)
-}
 
 
 
