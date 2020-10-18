@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 object AnswerRepo {
 
-    private const val ANSWER_PER_REQUEST = 10
+    private const val ANSWER_PER_REQUEST = 50
     private const val KEY_OPENED_ANSWERS = "opened_answers"
 
     fun getAnswers(

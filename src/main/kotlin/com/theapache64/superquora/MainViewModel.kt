@@ -26,6 +26,7 @@ fun main() {
 
         5 -> {
             // answer
+            watchOpenRandomAnswer()
             watchForRemoveAnswerFromOpenedList()
         }
 
@@ -35,10 +36,8 @@ fun main() {
 
 fun watchForRemoveAnswerFromOpenedList() {
 
-    // Setting click listener on page
-    document.body?.onmousedown = {
-        console.log(it)
-        if (it.button == 1.toShort()) {
+    document.body?.onkeyup = {
+        if (it.keyCode == 46) {
             val answerId = URL(window.location.toString()).searchParams.get("id")
             if (answerId != null) {
                 AnswerRepo.removeFromOpenedAnswers(answerId)
