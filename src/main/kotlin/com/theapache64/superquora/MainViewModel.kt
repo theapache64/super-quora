@@ -12,26 +12,28 @@ import org.w3c.dom.url.URL
 
 private lateinit var params: Params
 private var fatalError: String? = null
+private var shouldShowAnswerReady: Boolean = false
 
 val fullAnswers = mutableListOf<Answer>()
 var currentPage: Int = 0
 
+val ANSWER_REGEX = "https:\\/\\/www\\.quora\\.com\\/(.+?)\\/answers?\\/".toRegex()
+
 fun main() {
 
-    when (window.location.toString().count { char -> char == '/' }) {
-        3 -> {
-            // question
-            watchOpenRandomAnswer()
-        }
+    val pageUrl = window.location.toString()
+    val slashCount = pageUrl.count { char -> char == '/' }
 
-        5 -> {
-            // answer
+    if (slashCount == 3) {
+        // question
+        watchOpenRandomAnswer()
+    } else {
+        val isAnswer = ANSWER_REGEX.find(pageUrl) != null
+        if (isAnswer) {
             watchOpenRandomAnswer()
             watchForRemoveAnswerFromOpenedList()
         }
-
     }
-
 }
 
 fun watchForRemoveAnswerFromOpenedList() {
@@ -142,6 +144,7 @@ fun getRandomAnswer(
             )
         }
     } else {
+        shouldShowAnswerReady = true
         Notiflix.Notify.Info("Wo wo wo! Wait a sec. Quora is not fast as you ...")
     }
 }
@@ -167,6 +170,10 @@ private fun loadNextPage(
 
             if (currentPageAnswers.isNotEmpty()) {
                 fullAnswers.addAll(currentPageAnswers)
+                if (shouldShowAnswerReady) {
+                    Notiflix.Notify.Success("Now try! :)")
+                    shouldShowAnswerReady = false
+                }
                 onDataLoaded()
             } else {
                 onError("No more answers")
