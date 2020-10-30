@@ -29,11 +29,11 @@ fun main() {
 
     if (slashCount == 3) {
         // question
-        watchOpenRandomAnswer()
+        watchOpenRandomAnswer(isQuestion = true)
     } else {
         val isAnswer = ANSWER_REGEX.find(pageUrl) != null
         if (isAnswer) {
-            watchOpenRandomAnswer()
+            watchOpenRandomAnswer(isQuestion = false)
             watchForRemoveAnswerFromOpenedList()
         }
     }
@@ -52,28 +52,44 @@ fun watchForRemoveAnswerFromOpenedList() {
     }
 }
 
+private const val QUESTION_DIV_SELECTOR =
+    "#root > div > div > div:nth-child(3) > div > div > div:nth-child(1) > div.q-box.qu-borderBottom > div > div.q-box.qu-zIndex--action_bar > div > div:nth-child(1)"
+private const val ANSWER_DIV_SELECTOR =
+    "#root > div > div > div:nth-child(3) > div > div > div > div.q-box.qu-borderAll.qu-borderRadius--small.qu-borderColor--raised.qu-boxShadow--small.qu-bg--raised > div.q-box.qu-pt--medium.qu-px--medium.qu-pb--tiny > div.q-box.qu-bg--raised.qu-zIndex--action_bar.qu-borderTop.qu-boxShadow--n_small > div > div:nth-child(1)"
 
-private fun watchOpenRandomAnswer() {
+private fun watchOpenRandomAnswer(isQuestion: Boolean) {
 
     // Add 'Random Answer' Button
+
+    val selector = if (isQuestion) {
+        QUESTION_DIV_SELECTOR
+    } else {
+        ANSWER_DIV_SELECTOR
+    }
+
     val buttonContainer =
-        document.querySelector("#root > div > div > div:nth-child(3) > div > div > div:nth-child(1) > div.q-box.qu-borderBottom > div > div.q-box.qu-zIndex--action_bar > div > div:nth-child(1)") as? HTMLDivElement
+        document.querySelector(selector) as? HTMLDivElement
     if (buttonContainer != null) {
         buttonContainer.insertAdjacentHTML("beforeend", OPEN_RANDOM_QUESTION_BUTTON)
+
+        // Adding listener for added button
+        val openRandomAnswerButton = document.getElementById("button_open_random_answer") as HTMLButtonElement
+        openRandomAnswerButton.addEventListener("click", {
+            openRandomAnswer()
+        })
+
+        prepareData(isQuestion)
     } else {
         console.log("Failed to find button container")
     }
+}
 
-    val openRandomAnswerButton = document.getElementById("button_open_random_answer") as HTMLButtonElement
-    openRandomAnswerButton.addEventListener("click", {
-        openRandomAnswer()
-    })
-
+private fun prepareData(isQuestion: Boolean) {
     document.documentElement?.outerHTML?.let { pageData ->
 
         val htmlAnalyzer = HtmlAnalyzer(pageData)
         val formKey = htmlAnalyzer.getFormKey()
-        val questionId = htmlAnalyzer.getQuestionId()
+        val questionId = htmlAnalyzer.getQuestionId(isQuestion)
         val hashUrl = htmlAnalyzer.getHashUrl()
 
         // Getting hash

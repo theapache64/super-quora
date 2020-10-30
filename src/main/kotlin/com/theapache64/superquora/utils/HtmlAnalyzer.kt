@@ -10,8 +10,12 @@ class HtmlAnalyzer(
         return formKeyRegEx.find(inputHtml)!!.groupValues[1]
     }
 
-    fun getQuestionId(): String {
-        val qIdRegEx = "\"pageOid\": (?<qId>\\d+)".toRegex()
+    fun getQuestionId(isQuestion: Boolean): String {
+        val qIdRegEx = if (isQuestion) {
+            "\"pageOid\": (?<qId>\\d+)".toRegex()
+        } else {
+            "\\\\\"qid\\\\\":(?<qId>\\d+)".toRegex()
+        }
         return qIdRegEx.find(inputHtml)!!.groupValues[1]
     }
 
