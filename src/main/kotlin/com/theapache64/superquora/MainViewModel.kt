@@ -6,8 +6,11 @@ import com.theapache64.superquora.models.Params
 import com.theapache64.superquora.utils.AjaxHelper
 import com.theapache64.superquora.utils.HashHelper
 import com.theapache64.superquora.utils.HtmlAnalyzer
+import com.theapache64.superquora.utils.OPEN_RANDOM_QUESTION_BUTTON
 import kotlinx.browser.document
 import kotlinx.browser.window
+import org.w3c.dom.HTMLButtonElement
+import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.url.URL
 
 private lateinit var params: Params
@@ -49,7 +52,23 @@ fun watchForRemoveAnswerFromOpenedList() {
     }
 }
 
+
 private fun watchOpenRandomAnswer() {
+
+    // Add 'Random Answer' Button
+    val buttonContainer =
+        document.querySelector("#root > div > div > div:nth-child(3) > div > div > div:nth-child(1) > div.q-box.qu-borderBottom > div > div.q-box.qu-zIndex--action_bar > div > div:nth-child(1)") as? HTMLDivElement
+    if (buttonContainer != null) {
+        buttonContainer.insertAdjacentHTML("beforeend", OPEN_RANDOM_QUESTION_BUTTON)
+    } else {
+        console.log("Failed to find button container")
+    }
+
+    val openRandomAnswerButton = document.getElementById("button_open_random_answer") as HTMLButtonElement
+    openRandomAnswerButton.addEventListener("click", {
+        openRandomAnswer()
+    })
+
     document.documentElement?.outerHTML?.let { pageData ->
 
         val htmlAnalyzer = HtmlAnalyzer(pageData)
@@ -76,37 +95,28 @@ private fun watchOpenRandomAnswer() {
         )
 
     }
+}
 
-    // Setting click listener on page
-    document.body?.onmousedown = {
-
-        if (it.button == 1.toShort()) {
-            if (fatalError != null) {
-                window.alert(fatalError!!)
-            } else {
-
-                getRandomAnswer(
-                    onAnswer = { randomAnswer ->
-                        console.log("Random : $randomAnswer")
-                        window.open(
-                            "https://quora.com${randomAnswer.permaUrl}?id=${randomAnswer.id}",
-                            "_blank"
-                        )
-                    },
-                    onLoadingMore = {
-                        Notiflix.Notify.Info("You've already read all answers in page $currentPage, checking next page")
-                    },
-                    onNoMoreAnswer = {
-                        fatalError = "No more random answers. You've read all!"
-                        Notiflix.Notify.Failure(fatalError!!)
-                    },
-                    onError = { message ->
-                        Notiflix.Notify.Failure("Error: $message")
-                    }
-                )
-            }
+private fun openRandomAnswer() {
+    getRandomAnswer(
+        onAnswer = { randomAnswer ->
+            console.log("Random : $randomAnswer")
+            window.open(
+                "https://quora.com${randomAnswer.permaUrl}?id=${randomAnswer.id}",
+                "_blank"
+            )
+        },
+        onLoadingMore = {
+            Notiflix.Notify.Info("You've already read all answers in page $currentPage, checking next page")
+        },
+        onNoMoreAnswer = {
+            fatalError = "No more random answers. You've read all!"
+            Notiflix.Notify.Failure(fatalError!!)
+        },
+        onError = { message ->
+            Notiflix.Notify.Failure("Error: $message")
         }
-    }
+    )
 }
 
 
