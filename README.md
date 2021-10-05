@@ -5,8 +5,7 @@ super-quora is a Google Chrome extension to add powerful features to `Quora.com`
 
 ### Random Answer 
 
-To open random answer of a specific question. Useful for people who struggle to track the answers they read on a 
-question which got a huge amount of answers. Everytime you press the "Random Answer" button, you'll be prompted with a new tab.
+To open random answer of a specific question. Useful when you've a 1000+ answers and you already read the first 3 or 4 pages and lazy to scroll down.
 
 - ![](https://i.imgur.com/N7Choaz.png)
 - ![](https://i.imgur.com/sRikDlV.png)
